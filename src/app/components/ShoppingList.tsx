@@ -8,6 +8,7 @@ import { LogOut, Loader2, Search, X, ChevronDown, ChevronUp, Star, Minus, Plus, 
 import { toast } from "sonner";
 import { User } from "../services/api";
 import { mockApi, ShoppingItem, ProductSuggestion } from "../services/mockApi";
+import { ShareListDialog } from "./ShareListDialog";
 
 interface ShoppingListProps {
   user: User;
@@ -388,7 +389,6 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
 
   const handleShareList = () => {
     setShowShareDialog(true);
-    toast.info("Funkcja udostępniania będzie dostępna wkrótce!", { duration: 3000 });
   };
 
   const today = new Date().toLocaleDateString("pl-PL", {
@@ -782,6 +782,14 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
           )}
         </div>
       </div>
+
+      {/* Dialog udostępniania listy */}
+      <ShareListDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        listId={1}
+        isDemoMode={isDemoMode}
+      />
     </div>
   );
 }

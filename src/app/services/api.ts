@@ -15,6 +15,18 @@ export interface Task {
   created_at: string;
 }
 
+export interface ListShare {
+  user_id: number;
+  email: string;
+  name?: string;
+  shared_at: string;
+}
+
+export interface ShareListResponse {
+  message: string;
+  share: ListShare;
+}
+
 export interface LoginResponse {
   access_token: string;
   token_type: string;
@@ -145,6 +157,48 @@ class ApiService {
     if (!response.ok) {
       throw new Error("Błąd usuwania zadania");
     }
+  }
+
+  // Shopping List Sharing API
+  async shareList(listId: number, userEmail: string): Promise<ShareListResponse> {
+    const response = await fetch(`${API_URL}/shopping-lists/${listId}/share`, {
+      method: "POST",
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ user_email: userEmail }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Błąd udostępniania listy");
+    }
+
+    return response.json();
+  }
+
+  async getListShares(listId: number): Promise<ListShare[]> {
+    const response = await fetch(`${API_URL}/shopping-lists/${listId}/shares`, {
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd pobierania listy udostępnień");
+    }
+
+    return response.json();
+  }
+
+  async removeListShare(listId: number, userId: number): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/shopping-lists/${listId}/shares/${userId}`, {
+      method: "DELETE",
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Błąd usuwania udostępnienia");
+    }
+
+    return response.json();
   }
 
   logout(): void {

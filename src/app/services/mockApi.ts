@@ -17,6 +17,13 @@ export interface ProductSuggestion {
   starred?: boolean;
 }
 
+export interface MockListShare {
+  user_id: number;
+  email: string;
+  name?: string;
+  shared_at: string;
+}
+
 const DEMO_USER: User = {
   id: 1,
   email: "demo@example.com",
@@ -27,6 +34,7 @@ const DEMO_SHOPPING_KEY = "demo_shopping";
 const DEMO_USER_KEY = "demo_user";
 const DEMO_MODE_KEY = "demo_mode";
 const STARRED_PRODUCTS_KEY = "starred_products";
+const LIST_SHARES_KEY = "demo_list_shares";
 
 // Początkowe przykładowe zadania
 const getInitialTasks = (): Task[] => [
@@ -326,6 +334,32 @@ class MockApiService {
     }
     
     localStorage.setItem(STARRED_PRODUCTS_KEY, JSON.stringify(starred));
+  }
+
+  getListShares(): MockListShare[] {
+    const sharesJson = localStorage.getItem(LIST_SHARES_KEY);
+    return sharesJson ? JSON.parse(sharesJson) : [];
+  }
+
+  createListShare(email: string, name?: string): MockListShare {
+    const shares = this.getListShares();
+    // Generuj unikalny user_id bazując na emailu
+    const userId = Math.abs(email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
+    const newShare: MockListShare = {
+      user_id: userId,
+      email,
+      name,
+      shared_at: new Date().toISOString(),
+    };
+    shares.push(newShare);
+    localStorage.setItem(LIST_SHARES_KEY, JSON.stringify(shares));
+    return newShare;
+  }
+
+  deleteListShare(email: string): void {
+    const shares = this.getListShares();
+    const filteredShares = shares.filter((s) => s.email !== email);
+    localStorage.setItem(LIST_SHARES_KEY, JSON.stringify(filteredShares));
   }
 }
 
