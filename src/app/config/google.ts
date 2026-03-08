@@ -41,7 +41,7 @@
 // 7. Skopiuj "Client ID" (format: xxxxx.apps.googleusercontent.com)
 //    i wklej poniżej:
 
-export const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+export const GOOGLE_CLIENT_ID = "285468601548-8st6r58ipd1s75q53n278jbo05o9t1d9.apps.googleusercontent.com";
 
 // ✅ NIE MUSISZ włączać żadnego API (Google+, Identity itp.)
 // ✅ Google Sign-In działa od razu po skonfigurowaniu OAuth Client ID
