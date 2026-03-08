@@ -37,6 +37,9 @@ export function LoginForm({ onLogin, onRegister, onDemoLogin, onGoogleLogin }: L
   const [googleSdkLoaded, setGoogleSdkLoaded] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement>(null);
 
+  // Ukryj standardowe logowanie (comment for future use)
+  const showStandardLogin = false;
+
   useEffect(() => {
     // Inicjalizuj Google Sign-In
     const initializeGoogleSignIn = () => {
@@ -194,54 +197,58 @@ export function LoginForm({ onLogin, onRegister, onDemoLogin, onGoogleLogin }: L
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="twoj@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+          {showStandardLogin && (
+            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="twoj@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Hasło</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {isRegistering ? "Rejestracja..." : "Logowanie..."}
+                  </>
+                ) : (
+                  <>{isRegistering ? "Zarejestruj się" : "Zaloguj się"}</>
+                )}
+              </Button>
+            </form>
+          )}
+          {showStandardLogin && (
+            <div className="mt-4 text-center">
+              <Button
+                variant="link"
+                onClick={() => setIsRegistering(!isRegistering)}
                 disabled={isSubmitting}
-                required
-              />
+                className="text-sm"
+              >
+                {isRegistering
+                  ? "Masz już konto? Zaloguj się"
+                  : "Nie masz konta? Zarejestruj się"}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Hasło</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isSubmitting}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {isRegistering ? "Rejestracja..." : "Logowanie..."}
-                </>
-              ) : (
-                <>{isRegistering ? "Zarejestruj się" : "Zaloguj się"}</>
-              )}
-            </Button>
-          </form>
-          <div className="mt-4 text-center">
-            <Button
-              variant="link"
-              onClick={() => setIsRegistering(!isRegistering)}
-              disabled={isSubmitting}
-              className="text-sm"
-            >
-              {isRegistering
-                ? "Masz już konto? Zaloguj się"
-                : "Nie masz konta? Zarejestruj się"}
-            </Button>
-          </div>
+          )}
           <div className="mt-4 pt-4 border-t">
             <Button
               variant="outline"

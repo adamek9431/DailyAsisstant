@@ -182,12 +182,29 @@ class ApiService {
 
   // Shopping List API
   async getDefaultShoppingList(): Promise<{ id: number; name: string; owner_id: number }> {
+    console.log('Getting default shopping list...');
+    
     const response = await fetch(`${API_URL}/shopping-lists/default`, {
       headers: this.getAuthHeader(),
     });
 
     if (!response.ok) {
+      console.error('Failed to get default list:', response.status);
       throw new Error("Błąd pobierania listy zakupów");
+    }
+
+    const list = await response.json();
+    console.log('Got shopping list:', list);
+    return list;
+  }
+
+  async getAllAccessibleLists(): Promise<Array<{ id: number; name: string; owner_id: number; is_owner: boolean }>> {
+    const response = await fetch(`${API_URL}/shopping-lists`, {
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd pobierania list zakupów");
     }
 
     return response.json();
@@ -302,6 +319,8 @@ class ApiService {
     name: string, 
     quantity?: string
   ): Promise<ShoppingListItem> {
+    console.log('Creating item:', { listId, name, quantity });
+    
     const response = await fetch(`${API_URL}/shopping-lists/${listId}/items`, {
       method: "POST",
       headers: this.getAuthHeader(),
@@ -309,7 +328,19 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error("Błąd dodawania produktu");
+      let errorDetails;
+      try {
+        errorDetails = await response.json();
+      } catch (e) {
+        errorDetails = { detail: response.statusText };
+      }
+      console.error('Create item error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorDetails,
+        url: `${API_URL}/shopping-lists/${listId}/items`
+      });
+      throw new Error(errorDetails.detail || "Błąd dodawania produktu");
     }
 
     return response.json();
