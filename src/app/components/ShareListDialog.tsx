@@ -10,7 +10,7 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Loader2, Trash2, UserPlus } from "lucide-react";
+import { Loader2, Trash2, UserPlus, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, ListShare } from "../services/api";
 import { mockApi, MockListShare } from "../services/mockApi";
@@ -32,6 +32,7 @@ export function ShareListDialog({
   const [shares, setShares] = useState<(ListShare | MockListShare)[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingShares, setIsLoadingShares] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const loadShares = useCallback(async () => {
     setIsLoadingShares(true);
@@ -54,6 +55,7 @@ export function ShareListDialog({
   useEffect(() => {
     if (open) {
       loadShares();
+      setErrorMessage(""); // Wyczyść błędy przy otwarciu dialogu
     }
   }, [open, loadShares]);
 
@@ -71,6 +73,7 @@ export function ShareListDialog({
     }
 
     setIsLoading(true);
+    setErrorMessage(""); // Wyczyść poprzednie błędy
     try {
       if (isDemoMode) {
         // Sprawdź czy email już jest na liście
@@ -92,7 +95,9 @@ export function ShareListDialog({
       setEmail("");
       await loadShares();
     } catch (error: any) {
-      toast.error(error.message || "Nie udało się udostępnić listy");
+      const message = error.message || "Nie udało się udostępnić listy";
+      setErrorMessage(message); // Pokaż błąd w dialogu
+      toast.error(message, { duration: 5000 }); // Dłuższy toast
     } finally {
       setIsLoading(false);
     }
@@ -131,6 +136,21 @@ export function ShareListDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
+          {/* Komunikat błędu */}
+          {errorMessage && (
+            <div className="flex flex-col gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 whitespace-pre-line">{errorMessage}</p>
+              </div>
+              {!isDemoMode && (
+                <div className="text-xs text-red-600 bg-red-100 p-2 rounded">
+                  💡 Sprawdź konsolę przeglądarki (F12) aby zobaczyć szczegóły błędu z backendu
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Formularz dodawania użytkownika */}
           <div className="grid gap-2">
             <Label htmlFor="email">Email użytkownika</Label>
@@ -160,6 +180,11 @@ export function ShareListDialog({
                 )}
               </Button>
             </div>
+            {!isDemoMode && (
+              <p className="text-xs text-gray-500">
+                💡 Wskazówka: Osoba, której chcesz udostępnić listę, musi najpierw zalogować się do aplikacji przez Google OAuth.
+              </p>
+            )}
           </div>
 
           {/* Lista udostępnionych użytkowników */}

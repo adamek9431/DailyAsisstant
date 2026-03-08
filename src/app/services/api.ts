@@ -168,8 +168,34 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Błąd udostępniania listy");
+      let error: any = {};
+      try {
+        error = await response.json();
+      } catch (e) {
+        error = { detail: `HTTP ${response.status}: ${response.statusText}` };
+      }
+      
+      // Loguj szczegóły błędu dla debugowania
+      console.error('Share list error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: error,
+        userEmail: userEmail,
+        listId: listId
+      });
+      
+      // Obsługa różnych kodów błędów
+      if (response.status === 404) {
+        throw new Error(
+          `Użytkownik ${userEmail} nie został znaleziony w systemie.\n\nUpewnij się, że:\n• Email jest poprawnie wpisany\n• Osoba zalogowała się do aplikacji tym samym emailem Google\n• Email jest dokładnie taki sam (wielkość liter)`
+        );
+      } else if (response.status === 400) {
+        throw new Error(error.detail || "Nieprawidłowe dane");
+      } else if (response.status === 409) {
+        throw new Error("Lista jest już udostępniona temu użytkownikowi");
+      }
+      
+      throw new Error(error.detail || `Błąd ${response.status}: ${response.statusText}`);
     }
 
     return response.json();
