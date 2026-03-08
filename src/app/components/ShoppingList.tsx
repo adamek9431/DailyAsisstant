@@ -6,7 +6,7 @@ import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { LogOut, Loader2, Search, X, ChevronDown, ChevronUp, Star, Minus, Plus, Milk, Wheat, Beef, Drumstick, Carrot, Apple, Package, Coffee, ShoppingBag, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { User } from "../services/api";
+import { User, api as realApi } from "../services/api";
 import { mockApi, ShoppingItem, ProductSuggestion } from "../services/mockApi";
 import { ShareListDialog } from "./ShareListDialog";
 
@@ -31,10 +31,25 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
   const [customProductUnit, setCustomProductUnit] = useState("szt");
   const [showCustomProductForm, setShowCustomProductForm] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shoppingListId, setShoppingListId] = useState<number>(1);
 
   useEffect(() => {
+    loadShoppingListId();
     loadItems();
   }, []);
+
+  const loadShoppingListId = async () => {
+    if (!isDemoMode) {
+      try {
+        const list = await realApi.getDefaultShoppingList();
+        setShoppingListId(list.id);
+      } catch (error) {
+        console.error("Błąd pobierania ID listy:", error);
+        // Fallback do ID 1 jeśli się nie uda
+        setShoppingListId(1);
+      }
+    }
+  };
 
   const loadItems = () => {
     try {
@@ -787,7 +802,7 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
       <ShareListDialog
         open={showShareDialog}
         onOpenChange={setShowShareDialog}
-        listId={1}
+        listId={shoppingListId}
         isDemoMode={isDemoMode}
       />
     </div>

@@ -170,6 +170,19 @@ class ApiService {
     return response.json();
   }
 
+  // Shopping List API
+  async getDefaultShoppingList(): Promise<{ id: number; name: string; owner_id: number }> {
+    const response = await fetch(`${API_URL}/shopping-lists/default`, {
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd pobierania listy zakupów");
+    }
+
+    return response.json();
+  }
+
   async searchUsers(query?: string): Promise<User[]> {
     const url = query 
       ? `${API_URL}/users/search?q=${encodeURIComponent(query)}`
@@ -188,6 +201,8 @@ class ApiService {
 
   // Shopping List Sharing API
   async shareList(listId: number, userId: number): Promise<ShareListResponse> {
+    console.log('Sharing list:', { listId, userId, url: `${API_URL}/shopping-lists/${listId}/share` });
+    
     const response = await fetch(`${API_URL}/shopping-lists/${listId}/share`, {
       method: "POST",
       headers: this.getAuthHeader(),
@@ -208,12 +223,19 @@ class ApiService {
         statusText: response.statusText,
         error: error,
         userId: userId,
-        listId: listId
+        listId: listId,
+        fullUrl: `${API_URL}/shopping-lists/${listId}/share`
       });
       
       // Obsługa różnych kodów błędów
       if (response.status === 404) {
-        throw new Error("Użytkownik nie został znaleziony w systemie");
+        if (error.detail && error.detail.includes('Lista')) {
+          throw new Error("Lista zakupów nie została znaleziona. Upewnij się, że lista istnieje.");
+        } else if (error.detail && error.detail.includes('Użytkownik')) {
+          throw new Error(error.detail);
+        } else {
+          throw new Error("Lista zakupów nie została znaleziona lub endpoint nie istnieje");
+        }
       } else if (response.status === 400) {
         throw new Error(error.detail || "Nieprawidłowe dane");
       } else if (response.status === 409) {
