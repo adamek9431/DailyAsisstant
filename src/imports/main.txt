@@ -1,0 +1,154 @@
+from typing import List
+
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
+import models
+import schemas
+from database import engine, get_db
+from security import (
+    create_access_token,
+    get_current_user,
+    get_password_hash,
+    verify_password,
+)
+
+# Inicjalizacja baz do środowiska (SQLite)
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="Backend API with Tasks and Auth",
+    description="REST API backend realizujący wymogi biznesowe JSON & JWT.",
+    version="1.0.0",
+)
+
+# Konfiguracja CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/", include_in_schema=False)
+def read_root() -> RedirectResponse:
+    """Przekierowanie z roota na dokumentację Swagger UI."""
+    return RedirectResponse(url="/docs")
+
+
+@app.post("/api/auth/register", response_model=schemas.UserRegisterResponse)
+def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    """Rejestruje nowego użytkownika w systemie."""
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(user.password)
+    new_user = models.User(email=user.email, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return {"message": "User created successfully", "user_id": new_user.id}
+
+
+@app.post("/api/auth/login", response_model=schemas.Token)
+def login(user_credentials: schemas.UserCreate, db: Session = Depends(get_db)):
+    """Logowanie zwracające token w postaci zgodnej z wytycznymi."""
+    db_user = db.query(models.User).filter(models.User.email == user_credentials.email).first()
+    if not db_user or not verify_password(user_credentials.password, db_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+    
+    access_token = create_access_token(data={"sub": db_user.email})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": db_user.id,
+            "email": db_user.email
+        }
+    }
+
+
+@app.get("/api/tasks", response_model=List[schemas.TaskResponse])
+def get_tasks(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Pobiera listę zadań powiązanych z zalogowanym tokenem użytkownika."""
+    tasks = db.query(models.Task).filter(models.Task.user_id == current_user.id).all()
+    return tasks
+
+
+@app.post("/api/tasks", response_model=schemas.TaskResponse)
+def create_task(
+    task: schemas.TaskCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Tworzy zadanie przypisując relacyjnie zalogowanego użytkownika."""
+    new_task = models.Task(
+        title=task.title,
+        user_id=current_user.id
+    )
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+    return new_task
+
+
+@app.patch("/api/tasks/{task_id}", response_model=schemas.TaskResponse)
+def update_task(
+    task_id: int,
+    task_update: schemas.TaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Zmienia status wykonania zadania i jego detale (PATCH)."""
+    db_task = db.query(models.Task).filter(
+        models.Task.id == task_id,
+        models.Task.user_id == current_user.id
+    ).first()
+    
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    update_data = task_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_task, key, value)
+        
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+
+@app.delete("/api/tasks/{task_id}")
+def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Usuwa zadanie autoryzując relacyjne bezpieczeństwo do właściciela zadania."""
+    db_task = db.query(models.Task).filter(
+        models.Task.id == task_id,
+        models.Task.user_id == current_user.id
+    ).first()
+    
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    db.delete(db_task)
+    db.commit()
+    return {"message": "Task deleted"}
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
