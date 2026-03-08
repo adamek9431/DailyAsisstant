@@ -6,8 +6,8 @@ import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { LogOut, Loader2, Search, X, ChevronDown, ChevronUp, Star, Minus, Plus, Milk, Wheat, Beef, Drumstick, Carrot, Apple, Package, Coffee, ShoppingBag, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { User, api as realApi } from "../services/api";
-import { mockApi, ShoppingItem, ProductSuggestion } from "../services/mockApi";
+import { User, api as realApi, ShoppingListItem } from "../services/api";
+import { mockApi, ProductSuggestion } from "../services/mockApi";
 import { ShareListDialog } from "./ShareListDialog";
 
 interface ShoppingListProps {
@@ -17,8 +17,8 @@ interface ShoppingListProps {
 }
 
 export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingListProps) {
-  const [items, setItems] = useState<ShoppingItem[]>([]);
-  const [completedItems, setCompletedItems] = useState<ShoppingItem[]>([]);
+  const [items, setItems] = useState<ShoppingListItem[]>([]);
+  const [completedItems, setCompletedItems] = useState<ShoppingListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isListExpanded, setIsListExpanded] = useState(true);
@@ -35,8 +35,22 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
 
   useEffect(() => {
     loadShoppingListId();
-    loadItems();
   }, []);
+
+  useEffect(() => {
+    if (shoppingListId && !isDemoMode) {
+      loadItems();
+      
+      // Auto-refresh co 3 sekundy
+      const interval = setInterval(() => {
+        loadItems(true); // true = silent refresh (bez loading state)
+      }, 3000);
+      
+      return () => clearInterval(interval);
+    } else if (isDemoMode) {
+      loadItemsDemo();
+    }
+  }, [shoppingListId, isDemoMode]);
 
   const loadShoppingListId = async () => {
     if (!isDemoMode) {
@@ -45,18 +59,35 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
         setShoppingListId(list.id);
       } catch (error) {
         console.error("Błąd pobierania ID listy:", error);
-        // Fallback do ID 1 jeśli się nie uda
+        toast.error("Nie udało się pobrać listy zakupów");
         setShoppingListId(1);
       }
     }
   };
 
-  const loadItems = () => {
+  const loadItems = async (silent = false) => {
+    try {
+      if (!silent) setIsLoading(true);
+      
+      const fetchedItems = await realApi.getShoppingListItems(shoppingListId);
+      
+      // Rozdziel na niekupione i kupione
+      setItems(fetchedItems.filter((item) => !item.completed));
+      setCompletedItems(fetchedItems.filter((item) => item.completed));
+    } catch (error) {
+      if (!silent) {
+        toast.error("Nie udało się pobrać listy zakupów");
+        console.error(error);
+      }
+    } finally {
+      if (!silent) setIsLoading(false);
+    }
+  };
+
+  const loadItemsDemo = () => {
     try {
       const fetchedItems = mockApi.getShoppingItems();
-      // Filtruj tylko niekupione produkty
       setItems(fetchedItems.filter((item) => !item.completed));
-      // Filtruj tylko kupione produkty
       setCompletedItems(fetchedItems.filter((item) => item.completed));
     } catch (error) {
       toast.error("Nie udało się pobrać listy zakupów");
@@ -135,7 +166,7 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     setStarredProducts(mockApi.getStarredProducts());
   };
 
-  const handleAddFromSuggestion = (suggestion: ProductSuggestion) => {
+  const handleAddFromSuggestion = async (suggestion: ProductSuggestion) => {
     try {
       // Sprawdź czy produkt jest na liście kupionych
       const completedItem = completedItems.find(
@@ -148,8 +179,15 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
       } else {
         // Dodaj nowy produkt
         const defaultQuantity = suggestion.commonQuantities?.[0];
-        const newItem = mockApi.createShoppingItem(suggestion.name, defaultQuantity);
-        setItems([...items, newItem]);
+        
+        if (isDemoMode) {
+          const newItem = mockApi.createShoppingItem(suggestion.name, defaultQuantity);
+          setItems([...items, newItem]);
+        } else {
+          await realApi.createShoppingListItem(shoppingListId, suggestion.name, defaultQuantity);
+          await loadItems(true); // Odśwież listę
+        }
+        
         toast.success(`${suggestion.name} dodano do listy!`);
       }
     } catch (error) {
@@ -158,13 +196,18 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     }
   };
 
-  const handleCheckItem = (item: ShoppingItem) => {
+  const handleCheckItem = async (item: ShoppingListItem) => {
     try {
-      // Oznacz jako kupiony i przenieś do sublisty
-      mockApi.updateShoppingItem(item.id, { completed: true });
-      const updatedItem = { ...item, completed: true };
-      setItems(items.filter((i) => i.id !== item.id));
-      setCompletedItems([...completedItems, updatedItem]);
+      if (isDemoMode) {
+        mockApi.updateShoppingItem(item.id, { completed: true });
+        const updatedItem = { ...item, completed: true };
+        setItems(items.filter((i) => i.id !== item.id));
+        setCompletedItems([...completedItems, updatedItem]);
+      } else {
+        await realApi.updateShoppingListItem(shoppingListId, item.id, { completed: true });
+        await loadItems(true); // Odśwież listę
+      }
+      
       setIsListExpanded(false); // Zwiń dolną listę
       toast.success(`${item.name} kupiono! ✓`, {
         duration: 2000,
@@ -175,13 +218,18 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     }
   };
 
-  const handleUncheckItem = (item: ShoppingItem) => {
+  const handleUncheckItem = async (item: ShoppingListItem) => {
     try {
-      // Przywróć na górną listę
-      mockApi.updateShoppingItem(item.id, { completed: false });
-      const updatedItem = { ...item, completed: false };
-      setCompletedItems(completedItems.filter((i) => i.id !== item.id));
-      setItems([...items, updatedItem]);
+      if (isDemoMode) {
+        mockApi.updateShoppingItem(item.id, { completed: false });
+        const updatedItem = { ...item, completed: false };
+        setCompletedItems(completedItems.filter((i) => i.id !== item.id));
+        setItems([...items, updatedItem]);
+      } else {
+        await realApi.updateShoppingListItem(shoppingListId, item.id, { completed: false });
+        await loadItems(true); // Odśwież listę
+      }
+      
       toast.success(`${item.name} przywrócono do listy`, {
         duration: 2000,
       });
@@ -191,12 +239,23 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     }
   };
 
-  const handleClearCompleted = () => {
+  const handleClearCompleted = async () => {
     try {
-      completedItems.forEach((item) => {
-        mockApi.deleteShoppingItem(item.id);
-      });
-      setCompletedItems([]);
+      if (isDemoMode) {
+        completedItems.forEach((item) => {
+          mockApi.deleteShoppingItem(item.id);
+        });
+        setCompletedItems([]);
+      } else {
+        // Usuń wszystkie kupione produkty
+        await Promise.all(
+          completedItems.map(item => 
+            realApi.deleteShoppingListItem(shoppingListId, item.id)
+          )
+        );
+        await loadItems(true); // Odśwież listę
+      }
+      
       toast.success("Lista kupionych została wyczyszczona");
     } catch (error) {
       toast.error("Nie udało się wyczyścić listy");
@@ -262,21 +321,31 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     setDragOverItemIndex(null);
   };
 
-  const handleRemoveItem = (id: number) => {
+  const handleRemoveItem = async (id: number) => {
     try {
-      mockApi.deleteShoppingItem(id);
-      setItems(items.filter((item) => item.id !== id));
-      setCompletedItems(completedItems.filter((item) => item.id !== id));
+      if (isDemoMode) {
+        mockApi.deleteShoppingItem(id);
+        setItems(items.filter((item) => item.id !== id));
+        setCompletedItems(completedItems.filter((item) => item.id !== id));
+      } else {
+        await realApi.deleteShoppingListItem(shoppingListId, id);
+        await loadItems(true); // Odśwież listę
+      }
     } catch (error) {
       toast.error("Nie udało się usunąć produktu");
       console.error(error);
     }
   };
 
-  const handleQuantityChange = (item: ShoppingItem, newQuantity: string) => {
+  const handleQuantityChange = async (item: ShoppingListItem, newQuantity: string) => {
     try {
-      mockApi.updateShoppingItem(item.id, { quantity: newQuantity });
-      setItems(items.map(i => i.id === item.id ? { ...i, quantity: newQuantity } : i));
+      if (isDemoMode) {
+        mockApi.updateShoppingItem(item.id, { quantity: newQuantity });
+        setItems(items.map(i => i.id === item.id ? { ...i, quantity: newQuantity } : i));
+      } else {
+        await realApi.updateShoppingListItem(shoppingListId, item.id, { quantity: newQuantity });
+        await loadItems(true); // Odśwież listę
+      }
     } catch (error) {
       toast.error("Nie udało się zaktualizować ilości");
       console.error(error);
@@ -292,7 +361,7 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     return { value: 1, unit: quantity };
   };
 
-  const handleIncreaseQuantity = (e: React.MouseEvent, item: ShoppingItem) => {
+  const handleIncreaseQuantity = (e: React.MouseEvent, item: ShoppingListItem) => {
     e.preventDefault();
     e.stopPropagation();
     const { value, unit } = parseQuantity(item.quantity);
@@ -321,7 +390,7 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     handleQuantityChange(item, `${newValue.toFixed(precision)} ${unit}`);
   };
 
-  const handleDecreaseQuantity = (e: React.MouseEvent, item: ShoppingItem) => {
+  const handleDecreaseQuantity = (e: React.MouseEvent, item: ShoppingListItem) => {
     e.preventDefault();
     e.stopPropagation();
     const { value, unit } = parseQuantity(item.quantity);
@@ -357,7 +426,7 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
     }
   };
 
-  const handleAddCustomProduct = () => {
+  const handleAddCustomProduct = async () => {
     if (!customProductName.trim()) {
       toast.error("Wprowadź nazwę produktu");
       return;
@@ -388,8 +457,15 @@ export function ShoppingList({ user, onLogout, isDemoMode = false }: ShoppingLis
 
       // Dodaj nowy własny produkt
       const quantity = `1 ${customProductUnit}`;
-      const newItem = mockApi.createShoppingItem(customProductName.trim(), quantity);
-      setItems([...items, newItem]);
+      
+      if (isDemoMode) {
+        const newItem = mockApi.createShoppingItem(customProductName.trim(), quantity);
+        setItems([...items, newItem]);
+      } else {
+        await realApi.createShoppingListItem(shoppingListId, customProductName.trim(), quantity);
+        await loadItems(true); // Odśwież listę
+      }
+      
       toast.success(`${customProductName.trim()} dodano do listy!`);
       
       // Wyczyść formularz

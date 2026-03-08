@@ -20,6 +20,16 @@ export interface ListShare {
   shared_at: string;
 }
 
+export interface ShoppingListItem {
+  id: number;
+  list_id: number;
+  name: string;
+  quantity?: string;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ShareListResponse {
   message: string;
   share: ListShare;
@@ -272,6 +282,66 @@ class ApiService {
     }
 
     return response.json();
+  }
+
+  // Shopping List Items API
+  async getShoppingListItems(listId: number): Promise<ShoppingListItem[]> {
+    const response = await fetch(`${API_URL}/shopping-lists/${listId}/items`, {
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd pobierania produktów z listy");
+    }
+
+    return response.json();
+  }
+
+  async createShoppingListItem(
+    listId: number, 
+    name: string, 
+    quantity?: string
+  ): Promise<ShoppingListItem> {
+    const response = await fetch(`${API_URL}/shopping-lists/${listId}/items`, {
+      method: "POST",
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ name, quantity }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd dodawania produktu");
+    }
+
+    return response.json();
+  }
+
+  async updateShoppingListItem(
+    listId: number,
+    itemId: number,
+    data: { name?: string; quantity?: string; completed?: boolean }
+  ): Promise<ShoppingListItem> {
+    const response = await fetch(`${API_URL}/shopping-lists/${listId}/items/${itemId}`, {
+      method: "PUT",
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd aktualizacji produktu");
+    }
+
+    return response.json();
+  }
+
+  async deleteShoppingListItem(listId: number, itemId: number): Promise<void> {
+    const response = await fetch(`${API_URL}/shopping-lists/${listId}/items/${itemId}`, {
+      method: "DELETE",
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd usuwania produktu");
+    }
   }
 
   logout(): void {
