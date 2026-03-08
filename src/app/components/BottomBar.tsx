@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { CheckCircle2, ShoppingCart } from "lucide-react";
+import { CheckCircle2, ShoppingCart, User } from "lucide-react";
 
 export function BottomBar() {
   const location = useLocation();
@@ -30,6 +30,17 @@ export function BottomBar() {
         >
           <ShoppingCart className="w-6 h-6 mb-1" />
           <span className="text-xs font-medium">Zakupy</span>
+        </Link>
+        <Link
+          to="/profile"
+          className={`flex-1 flex flex-col items-center justify-center py-3 transition-colors ${
+            isActive("/profile")
+              ? "text-blue-600 bg-blue-50"
+              : "text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <User className="w-6 h-6 mb-1" />
+          <span className="text-xs font-medium">Profil</span>
         </Link>
       </div>
     </div>

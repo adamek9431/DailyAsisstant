@@ -25,8 +25,9 @@ export interface MockListShare {
 }
 
 const DEMO_USER: User = {
-  id: 1,
+  id: 10001,
   email: "demo@example.com",
+  name: "Demo User",
 };
 
 const DEMO_TASKS_KEY = "demo_tasks";
@@ -341,10 +342,8 @@ class MockApiService {
     return sharesJson ? JSON.parse(sharesJson) : [];
   }
 
-  createListShare(email: string, name?: string): MockListShare {
+  createListShare(userId: number, email: string, name?: string): MockListShare {
     const shares = this.getListShares();
-    // Generuj unikalny user_id bazując na emailu
-    const userId = Math.abs(email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
     const newShare: MockListShare = {
       user_id: userId,
       email,
@@ -356,10 +355,31 @@ class MockApiService {
     return newShare;
   }
 
-  deleteListShare(email: string): void {
+  deleteListShare(userId: number): void {
     const shares = this.getListShares();
-    const filteredShares = shares.filter((s) => s.email !== email);
+    const filteredShares = shares.filter((s) => s.user_id !== userId);
     localStorage.setItem(LIST_SHARES_KEY, JSON.stringify(filteredShares));
+  }
+
+  // Mock users for demo mode
+  searchUsers(query?: string): User[] {
+    const mockUsers: User[] = [
+      { id: 10001, email: "demo@example.com", name: "Demo User" },
+      { id: 10002, email: "anna.kowalska@gmail.com", name: "Anna Kowalska" },
+      { id: 10003, email: "jan.nowak@gmail.com", name: "Jan Nowak" },
+      { id: 10004, email: "maria.wojcik@gmail.com", name: "Maria Wójcik" },
+    ];
+
+    if (!query || query.trim() === "") {
+      return mockUsers;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    return mockUsers.filter(
+      (user) =>
+        user.email.toLowerCase().includes(lowerQuery) ||
+        (user.name && user.name.toLowerCase().includes(lowerQuery))
+    );
   }
 }
 

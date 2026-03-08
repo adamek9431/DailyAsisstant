@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { Layout } from "./components/Layout";
 import { TaskList } from "./components/TaskList";
 import { ShoppingList } from "./components/ShoppingList";
+import { Profile } from "./components/Profile";
 
 // Ta funkcja zostanie wywołana z App.tsx z odpowiednimi propsami
 export const createAppRouter = (
@@ -25,6 +26,10 @@ export const createAppRouter = (
         {
           path: "shopping",
           element: <ShoppingList user={user} onLogout={onLogout} isDemoMode={isDemoMode} />,
+        },
+        {
+          path: "profile",
+          element: <Profile isDemoMode={isDemoMode} onLogout={onLogout} />,
         },
       ],
     },

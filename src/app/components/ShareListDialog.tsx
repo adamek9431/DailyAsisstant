@@ -28,7 +28,7 @@ export function ShareListDialog({
   listId,
   isDemoMode = false,
 }: ShareListDialogProps) {
-  const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [shares, setShares] = useState<(ListShare | MockListShare)[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingShares, setIsLoadingShares] = useState(false);
@@ -55,62 +55,61 @@ export function ShareListDialog({
   useEffect(() => {
     if (open) {
       loadShares();
-      setErrorMessage(""); // Wyczyść błędy przy otwarciu dialogu
+      setErrorMessage("");
+      setUserId("");
     }
   }, [open, loadShares]);
 
   const handleShare = async () => {
-    if (!email.trim()) {
-      toast.error("Wprowadź adres email");
+    const userIdNumber = parseInt(userId.trim());
+    
+    if (isNaN(userIdNumber) || userIdNumber <= 0) {
+      setErrorMessage("Proszę wpisać prawidłowy numer ID użytkownika");
+      toast.error("Nieprawidłowy numer ID");
       return;
     }
 
-    // Walidacja email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error("Wprowadź poprawny adres email");
+    // Sprawdź czy użytkownik już jest na liście
+    const alreadyShared = shares.some((s) => s.user_id === userIdNumber);
+    if (alreadyShared) {
+      setErrorMessage("Lista jest już udostępniona temu użytkownikowi");
+      toast.error("Lista już udostępniona");
       return;
     }
 
     setIsLoading(true);
-    setErrorMessage(""); // Wyczyść poprzednie błędy
+    setErrorMessage("");
+    
     try {
       if (isDemoMode) {
-        // Sprawdź czy email już jest na liście
-        const existing = shares.find((s) => s.email === email);
-        if (existing) {
-          toast.error("Ta lista jest już udostępniona temu użytkownikowi");
-          return;
-        }
-
-        // Wyodrębnij imię z emaila dla demo
-        const name = email.split("@")[0];
-        mockApi.createListShare(email, name);
-        toast.success(`Lista udostępniona użytkownikowi ${email}`);
+        // W trybie demo generuj mock email
+        const mockEmail = `user${userIdNumber}@example.com`;
+        mockApi.createListShare(userIdNumber, mockEmail, `User ${userIdNumber}`);
+        toast.success(`Lista udostępniona użytkownikowi ID: ${userIdNumber}`);
       } else {
-        const response = await api.shareList(listId, email);
+        const response = await api.shareList(listId, userIdNumber);
         toast.success(response.message);
       }
 
-      setEmail("");
+      setUserId("");
       await loadShares();
     } catch (error: any) {
       const message = error.message || "Nie udało się udostępnić listy";
-      setErrorMessage(message); // Pokaż błąd w dialogu
-      toast.error(message, { duration: 5000 }); // Dłuższy toast
+      setErrorMessage(message);
+      toast.error(message, { duration: 5000 });
+      console.error("Share error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRemoveShare = async (shareEmail: string, userId?: number) => {
+  const handleRemoveShare = async (shareUserId: number) => {
     try {
       if (isDemoMode) {
-        mockApi.deleteListShare(shareEmail);
+        mockApi.deleteListShare(shareUserId);
         toast.success("Udostępnienie zostało usunięte");
       } else {
-        if (!userId) return;
-        await api.removeListShare(listId, userId);
+        await api.removeListShare(listId, shareUserId);
         toast.success("Udostępnienie zostało usunięte");
       }
 
@@ -122,14 +121,14 @@ export function ShareListDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Udostępnij listę zakupów</DialogTitle>
           <DialogDescription>
-            Wprowadź adres email użytkownika, któremu chcesz udostępnić listę.
+            Wpisz ID użytkownika, któremu chcesz udostępnić listę zakupów.
             {isDemoMode && (
               <span className="block mt-2 text-amber-600">
-                Tryb demo: możesz wprowadzić dowolny email do testowania
+                Tryb demo: użyj dowolnego numeru (np. 2, 3, 4)
               </span>
             )}
           </DialogDescription>
@@ -138,39 +137,34 @@ export function ShareListDialog({
         <div className="grid gap-4 py-4">
           {/* Komunikat błędu */}
           {errorMessage && (
-            <div className="flex flex-col gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700 whitespace-pre-line">{errorMessage}</p>
-              </div>
-              {!isDemoMode && (
-                <div className="text-xs text-red-600 bg-red-100 p-2 rounded">
-                  💡 Sprawdź konsolę przeglądarki (F12) aby zobaczyć szczegóły błędu z backendu
-                </div>
-              )}
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">{errorMessage}</p>
             </div>
           )}
 
           {/* Formularz dodawania użytkownika */}
           <div className="grid gap-2">
-            <Label htmlFor="email">Email użytkownika</Label>
+            <Label htmlFor="userId">ID użytkownika</Label>
             <div className="flex gap-2">
               <Input
-                id="email"
-                type="email"
-                placeholder="jan.kowalski@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="userId"
+                type="number"
+                placeholder="np. 123"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleShare();
                   }
                 }}
                 disabled={isLoading}
+                min="1"
+                step="1"
               />
               <Button
                 onClick={handleShare}
-                disabled={isLoading || !email.trim()}
+                disabled={isLoading || !userId.trim()}
                 size="icon"
               >
                 {isLoading ? (
@@ -180,11 +174,9 @@ export function ShareListDialog({
                 )}
               </Button>
             </div>
-            {!isDemoMode && (
-              <p className="text-xs text-gray-500">
-                💡 Wskazówka: Osoba, której chcesz udostępnić listę, musi najpierw zalogować się do aplikacji przez Google OAuth.
-              </p>
-            )}
+            <p className="text-xs text-gray-500">
+              💡 Wskazówka: Poproś drugą osobę o zalogowanie się do aplikacji i podanie swojego ID z zakładki "Profil"
+            </p>
           </div>
 
           {/* Lista udostępnionych użytkowników */}
@@ -202,13 +194,20 @@ export function ShareListDialog({
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {shares.map((share) => (
                   <div
-                    key={share.email}
+                    key={share.user_id}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {share.name || share.email.split("@")[0]}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900 font-mono">
+                          ID: {share.user_id.toString().padStart(5, '0')}
+                        </p>
+                        {share.name && (
+                          <span className="text-xs text-gray-500">
+                            • {share.name}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500 truncate">
                         {share.email}
                       </p>
@@ -216,9 +215,7 @@ export function ShareListDialog({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() =>
-                        handleRemoveShare(share.email, share.user_id)
-                      }
+                      onClick={() => handleRemoveShare(share.user_id)}
                       className="ml-2 flex-shrink-0"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />

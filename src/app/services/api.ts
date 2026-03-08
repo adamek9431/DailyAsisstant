@@ -4,8 +4,6 @@ export interface User {
   id: number;
   email: string;
   name?: string;
-  avatar_url?: string;
-  google_id?: string;
 }
 
 export interface Task {
@@ -159,12 +157,41 @@ class ApiService {
     }
   }
 
+  // User Profile API
+  async getCurrentUser(): Promise<User> {
+    const response = await fetch(`${API_URL}/users/me`, {
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd pobierania profilu użytkownika");
+    }
+
+    return response.json();
+  }
+
+  async searchUsers(query?: string): Promise<User[]> {
+    const url = query 
+      ? `${API_URL}/users/search?q=${encodeURIComponent(query)}`
+      : `${API_URL}/users`;
+    
+    const response = await fetch(url, {
+      headers: this.getAuthHeader(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Błąd wyszukiwania użytkowników");
+    }
+
+    return response.json();
+  }
+
   // Shopping List Sharing API
-  async shareList(listId: number, userEmail: string): Promise<ShareListResponse> {
+  async shareList(listId: number, userId: number): Promise<ShareListResponse> {
     const response = await fetch(`${API_URL}/shopping-lists/${listId}/share`, {
       method: "POST",
       headers: this.getAuthHeader(),
-      body: JSON.stringify({ user_email: userEmail }),
+      body: JSON.stringify({ user_id: userId }),
     });
 
     if (!response.ok) {
@@ -180,15 +207,13 @@ class ApiService {
         status: response.status,
         statusText: response.statusText,
         error: error,
-        userEmail: userEmail,
+        userId: userId,
         listId: listId
       });
       
       // Obsługa różnych kodów błędów
       if (response.status === 404) {
-        throw new Error(
-          `Użytkownik ${userEmail} nie został znaleziony w systemie.\n\nUpewnij się, że:\n• Email jest poprawnie wpisany\n• Osoba zalogowała się do aplikacji tym samym emailem Google\n• Email jest dokładnie taki sam (wielkość liter)`
-        );
+        throw new Error("Użytkownik nie został znaleziony w systemie");
       } else if (response.status === 400) {
         throw new Error(error.detail || "Nieprawidłowe dane");
       } else if (response.status === 409) {
